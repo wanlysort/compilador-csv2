@@ -1,74 +1,95 @@
 
-Program ::= (GlobalDecl)*
-
-GlobalDecl ::= StructDec
-             | VarDec
-             | FunDec
-
-StructDecList   ::= (StructDec)*
-VarDecList      ::= (VarDec)*
-FunDecList      ::= (FunDec)*  
 
 
-// Soporte de Structs 
-StructDec       ::= struct id { (Type id ;)* } ;
+Program         ::= (StructDec)* (FunDec)*
 
-// Permitimos el tipado genérico opcional como <T>
+GlobalDecl      ::= StructDec
+                  | FunDec
+
+
+
+StructDec       ::= struct id { (Type id ;)* } [;]
+
+
+
 FunDec          ::= [ < id > ] Type id ( [ParamDecList] ) { Body }
 
 ParamDecList    ::= Type id (, Type id)*
 
-// Declaración de Variables y Arreglos 
+
+
 VarDec          ::= Type VarList ;
 VarList         ::= Var (, Var)*
 Var             ::= id DimList [= InitValue]
 
-// int matriz[10][10];
 DimList         ::= ([ Num ])*
 
-
 InitValue       ::= AExp | InitList
-InitList        ::= { InitItemList }
-InitItemList    ::= InitValue (, InitValue)*
+InitList        ::= { InitValue (, InitValue)* }
+
 
 
 Type            ::= BaseType ( * )*
-BaseType        ::= int | string | bool | id [ < Type > ]
+
+BaseType        ::= int
+                  | string
+                  | bool
+                  | auto
+                  | id [ < Type > ]
 
 
-Body            ::= BlockItemList
-BlockItemList   ::= (VarDec | Stmt)*
 
-StmtList        ::= Stmt (; Stmt)*
+Body            ::= (VarDec | Stmt)*
+
+
+
 Stmt            ::= for ( Type id = CExp ; CExp ; id (++ | --) ) { Body }
                   | while ( AExp ) { Body }
                   | if ( AExp ) { Body } (else if ( AExp ) { Body })* [else { Body }]
                   | do { Body } while ( AExp ) ;
-                  | LValue = AExp ;
-                  | printf ( Format , AExp ) ; 
                   | return AExp ;
+                  | printf ( StringLiteral , AExp ) ;
+                  | id ( [ArgList] ) ;
+                  | LValue = AExp ;
+
 
 
 LValue          ::= ( * )* id DimAccess ( . id DimAccess )*
-
 DimAccess       ::= ([ AExp ])*
 
 
+
 AExp            ::= BExp [ ( && | || ) BExp ]
-BExp            ::= CExp | ! ( CExp )
+
+BExp            ::= CExp
+                  | ! ( CExp )
+
 CExp            ::= Exp [ ( < | <= | == | > | >= | != ) Exp ]
 
 Exp             ::= Term ( ( + | - ) Term )*
+
 Term            ::= Factor ( ( * | / ) Factor )*
 
-Factor          ::= LValue 
-                  | &id 
-                  | Num 
-                  | Bool 
-                  | StringLiteral 
+Factor          ::= id ( [ArgList] )
+                  | LValue
+                  | & id
+                  | Num
+                  | Bool
+                  | StringLiteral
                   | LambdaDec
                   | ( AExp )
 
+
+ArgList         ::= AExp (, AExp)*
+
+
+Num             ::= [0-9]+
 Bool            ::= true | false
+StringLiteral   ::= " [^"]* "
+
+
 
 LambdaDec       ::= ( [ParamDecList] ) => { Body }
+
+
+
