@@ -21,22 +21,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# -----------------------------------------------------------------------------
-# Configuración
-# -----------------------------------------------------------------------------
-# Ajusta COMPILER_PATH al path del binario compilado dentro de WSL.
-# Por defecto asume que el backend se corre desde interface/backend/
-# y el binario está en ../../416608878/compilador
+
 COMPILER_PATH = os.environ.get(
     "COMPILER_PATH",
-    str(Path(__file__).parent.parent.parent / "416608878" / "compilador")
+    str(Path(__file__).parent.parent / "compiler" / "compilador")
 )
 
 TIMEOUT_SEC = 15  # segundos máximos para compilación/ejecución
 
-# -----------------------------------------------------------------------------
-# App
-# -----------------------------------------------------------------------------
+
 app = FastAPI(title="CS# Compiler API", version="1.0.0")
 
 app.add_middleware(
@@ -47,9 +40,6 @@ app.add_middleware(
 )
 
 
-# -----------------------------------------------------------------------------
-# Modelos de Request
-# -----------------------------------------------------------------------------
 class CompileRequest(BaseModel):
     code: str
 

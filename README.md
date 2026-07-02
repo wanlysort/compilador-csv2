@@ -37,22 +37,33 @@ echo 'int main() { return 0; }' > test.cs
 
 ---
 
-## Paso 2 — Backend FastAPI (WSL)
+# Paso 2- Backend
+
+Desde WSL, en la carpeta `backend/`:
 
 ```bash
-cd interface/backend
+cd /mnt/d/Desktop/UTEC/COMPILADORES/PROYECTOFINAL/backend
 
+# Crear y activar el virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependencias
 pip install -r requirements.txt
 
-# Ajusta el path al binario del compilador:
-export COMPILER_PATH="/ruta/wsl/a/416608878/compilador"
-
+# Levantar el servidor (Esta ruta es donde se cojera el compilado, es importante ya que sino no se podria)
+COMPILER_PATH=/mnt/d/Desktop/UTEC/COMPILADORES/PROYECTOFINAL/compiler/compilador \ 
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Verifica en el navegador: http://localhost:8000/health
+La próxima vez que se abrá WSL solo necesitas:
 
----
+```bash
+cd /mnt/d/Desktop/UTEC/COMPILADORES/PROYECTOFINAL/backend
+source venv/bin/activate
+COMPILER_PATH=/mnt/d/Desktop/UTEC/COMPILADORES/PROYECTOFINAL/compiler/compilador uvicorn main:app --reload --port 8000
+```
+
 
 ## Paso 3 — Frontend React (Windows o WSL)
 
