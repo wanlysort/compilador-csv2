@@ -17,13 +17,94 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
+#include <regex>
 
 #include "ast.h"
 #include "ast_printer.h"
 #include "parser.h"
 #include "scanner.h"
 #include "visitor.h"
+
+// =============================================================================
+// Peephole Optimizer — pasa sobre el ensamblador línea a línea eliminando
+// patrones redundantes.
+// =============================================================================
+std::string peepholeOptimize(const std::string &src)
+{
+    std::istringstream stream(src);
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(stream, line))
+        lines.push_back(line);
+
+    int removed = 0;
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        std::vector<std::string> out;
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            const std::string &cur  = lines[i];
+            const std::string &next = (i + 1 < lines.size()) ? lines[i + 1] : "";
+
+            // Patrón 1: pushq %rax ; popq %rax  → eliminar ambas
+            if (cur.find("pushq %rax") != std::string::npos &&
+                next.find("popq %rax") != std::string::npos)
+            {
+                ++i; // saltar las dos líneas
+                removed += 2;
+                changed = true;
+                continue;
+            }
+
+            // Patrón 2: movq %rax, X(%rbp) ; movq X(%rbp), %rax → solo el movq de store
+            std::smatch m1, m2;
+            std::regex storeRe(R"(^\s*movq %rax, (-?\d+\(%rbp\)))");
+            std::regex loadRe (R"(^\s*movq (-?\d+\(%rbp\)), %rax)");
+            if (std::regex_search(cur, m1, storeRe) &&
+                std::regex_search(next, m2, loadRe)  &&
+                m1[1] == m2[1])
+            {
+                out.push_back(cur); // conservar solo el store
+                ++i;                // saltar el load redundante
+                ++removed;
+                changed = true;
+                continue;
+            }
+
+            // Patrón 3: leaq N(%rbp), %rax ; movq (%rax), %rax → movq N(%rbp), %rax
+            // Generado por genLValueAddr() para variables locales simples.
+            // La dirección intermedia en %rax es innecesaria si se puede leer directo.
+            std::smatch m3;
+            std::regex leaqRbpRe(R"(^\s*leaq (-?\d+\(%rbp\)), %rax)");
+            std::regex derefRaxRe(R"(^\s*movq \(%rax\), %rax)");
+            if (std::regex_search(cur, m3, leaqRbpRe) &&
+                std::regex_search(next, derefRaxRe))
+            {
+                out.push_back("  movq " + m3[1].str() + ", %rax");
+                ++i;    // saltar el deref redundante
+                ++removed;
+                changed = true;
+                continue;
+            }
+
+            out.push_back(cur);
+        }
+        lines = out;
+    }
+
+    if (removed > 0)
+        std::cout << "[OPT] Peephole: " << removed << " instruccion(es) eliminada(s).\n";
+
+    std::string result;
+    for (auto &l : lines)
+        result += l + "\n";
+    return result;
+}
 
 int main(int argc, const char* argv[]) {
 
@@ -107,24 +188,16 @@ int main(int argc, const char* argv[]) {
 
     std::string outputFile = baseName + ".s";
 
-    std::ofstream outfile(outputFile);
-
-    if (!outfile.is_open()) {
-        std::cerr << "Error: no se pudo crear el archivo de salida '"
-                  << outputFile << "'\n";
-
-        delete program;
-        return 1;
-    }
-
     // -------------------------------------------------------------------------
     // Analisis semantico + generacion de codigo
     // -------------------------------------------------------------------------
+    std::ostringstream asmBuffer;
+
     try {
 
         std::cout << "[INFO] Ejecutando analisis semantico...\n";
 
-        GenCodeVisitor codegen(outfile);
+        GenCodeVisitor codegen(asmBuffer);
 
         codegen.generar(program);
 
@@ -136,11 +209,28 @@ int main(int argc, const char* argv[]) {
         std::cerr << "[ERROR] Compilacion detenida.\n";
         std::cerr << e.what() << "\n";
 
-        outfile.close();
         delete program;
         return 1;
     }
 
+    // -------------------------------------------------------------------------
+    // Peephole Optimization
+    // -------------------------------------------------------------------------
+    std::string optimizedAsm = peepholeOptimize(asmBuffer.str());
+
+    // -------------------------------------------------------------------------
+    // Escribir archivo de salida
+    // -------------------------------------------------------------------------
+    std::ofstream outfile(outputFile);
+
+    if (!outfile.is_open()) {
+        std::cerr << "Error: no se pudo crear el archivo de salida '"
+                  << outputFile << "'\n";
+        delete program;
+        return 1;
+    }
+
+    outfile << optimizedAsm;
     outfile.close();
 
     std::cout << "========================================\n";

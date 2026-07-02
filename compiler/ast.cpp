@@ -236,6 +236,11 @@ int PrintfStm::accept(Visitor *visitor)
     return visitor->visit(this);
 }
 
+// ---- CallStm ----
+CallStm::CallStm(CallExp *c) : call(c) {}
+CallStm::~CallStm() { delete call; }
+int CallStm::accept(Visitor *visitor) { return visitor->visit(this); }
+
 // ---- ReturnStm ----
 ReturnStm::ReturnStm(Exp *expresion) : e(expresion) {}
 ReturnStm::~ReturnStm()

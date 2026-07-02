@@ -357,6 +357,12 @@ TypeNode *Parser::parseType()
         base = "string";
     else if (match(Token::BOOL_TYPE))
         base = "bool";
+    // auto se trata como tipo genérico inferido (almacenado como 8 bytes)
+    else if (check(Token::ID) && current->text == "auto")
+    {
+        advance();
+        base = "auto";
+    }
     else if (match(Token::ID))
     {
         base = previous->text;
@@ -529,6 +535,24 @@ Stm *Parser::parseStm()
         Exp *e = parseAExp();
         expect(Token::SEMICOL);
         return new ReturnStm(e);
+    }
+
+    // ---- id ( args ) ; ---- llamada a función como sentencia
+    if (check(Token::ID) && next != nullptr && next->type == Token::LPAREN)
+    {
+        std::string fname = current->text;
+        advance(); // consume ID
+        advance(); // consume (
+        std::vector<Exp *> args;
+        if (!check(Token::RPAREN))
+        {
+            args.push_back(parseAExp());
+            while (match(Token::COMA))
+                args.push_back(parseAExp());
+        }
+        expect(Token::RPAREN);
+        expect(Token::SEMICOL);
+        return new CallStm(new CallExp(fname, args));
     }
 
     // ---- LValue = AExp ; ----

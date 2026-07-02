@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <string>
 #include "ast.h"
@@ -188,7 +189,12 @@ int TypeCheckerVisitor::visit(AssignStm *stm)
 
 int TypeCheckerVisitor::visit(PrintfStm *stm)
 {
-    // CORREGIDO: stm->exp pasa a stm->expression
+    return 0;
+}
+
+int TypeCheckerVisitor::visit(CallStm *stm)
+{
+    stm->call->accept(this);
     return 0;
 }
 
@@ -286,11 +292,16 @@ int TypeCheckerVisitor::visit(LambdaDecExp *lambda)
 
 int TypeCheckerVisitor::visit(CallExp *exp)
 {
-    // Permitir llamadas a variables que guardan lambdas (función por puntero)
+    // Funciones externas permitidas (libc)
+    static const std::unordered_set<std::string> externFuncs = {
+        "malloc", "free", "printf", "scanf", "strlen", "strcpy", "strcat"
+    };
+
     bool esFuncionDeclarada = funAridad.find(exp->functionName) != funAridad.end();
     bool esVariableLocal    = entorno.check(exp->functionName);
+    bool esFuncionExterna   = externFuncs.count(exp->functionName) > 0;
 
-    if (!esFuncionDeclarada && !esVariableLocal)
+    if (!esFuncionDeclarada && !esVariableLocal && !esFuncionExterna)
     {
         throw std::runtime_error(
             "[TypeChecker] Funcion no declarada: '" +
@@ -323,7 +334,44 @@ int GenCodeVisitor::generar(Program *program)
     tipos.TypeChecker(program);
     funcontador = tipos.funcontador;
     program->accept(this);
+    if (suReorders > 0)
+        std::cout << "[OPT] Sethi-Ullman: " << suReorders << " reordenamiento(s) de operandos aplicado(s).\n";
     return 0;
+}
+
+// =============================================================================
+// Sethi-Ullman — etiqueta el "peso" de un subárbol de expresión:
+//   Hoja constante  → 0  (no ocupa registro)
+//   Hoja variable   → 1  (necesita 1 registro)
+//   Nodo interno    → si hijos iguales: peso+1; si distintos: max(izq, der)
+// Determina el orden óptimo de evaluación para minimizar uso del stack.
+// =============================================================================
+int GenCodeVisitor::sethiUllmanLabel(Exp *exp)
+{
+    if (!exp) return 0;
+
+    // Hojas constantes → peso 0
+    if (dynamic_cast<NumberExp *>(exp) || dynamic_cast<BoolExp *>(exp))
+        return 0;
+
+    // Hojas variables / literales → peso 1
+    if (dynamic_cast<LValueNode *>(exp) || dynamic_cast<StringLiteralExp *>(exp))
+        return 1;
+
+    // Nodo binario → regla estándar Sethi-Ullman
+    if (auto *bin = dynamic_cast<BinaryExp *>(exp))
+    {
+        int l = sethiUllmanLabel(bin->left);
+        int r = sethiUllmanLabel(bin->right);
+        return (l == r) ? l + 1 : std::max(l, r);
+    }
+
+    // Unario → mismo peso que su operando
+    if (auto *un = dynamic_cast<UnaryExp *>(exp))
+        return un->operand ? sethiUllmanLabel(un->operand) : 1;
+
+    // CallExp, LambdaDecExp → tratar como subárbol pesado
+    return 2;
 }
 
 int GenCodeVisitor::visit(Program *program)
@@ -357,6 +405,10 @@ int GenCodeVisitor::visit(VarDec *vd)
 {
     for (auto &varNode : vd->varList)
     {
+        // Registrar variables de tipo string para usar print_str_fmt
+        if (vd->type->baseName == "string")
+            stringVars.insert(varNode->id);
+
         if (!entornoFuncion)
         {
             memoriaGlobal[varNode->id] = true;
@@ -408,7 +460,13 @@ int GenCodeVisitor::visit(Body *b)
     for (bool isStm : b->isStatementOrder)
     {
         if (isStm)
-            b->statements[stmIdx++]->accept(this);
+        {
+            Stm *stm = b->statements[stmIdx++];
+            stm->accept(this);
+            // Dead code elimination: parar después de un return
+            if (dynamic_cast<ReturnStm *>(stm))
+                break;
+        }
         else
             b->declarations[varIdx++]->accept(this);
     }
@@ -430,8 +488,12 @@ void GenCodeVisitor::genLValueAddr(LValueNode *lval)
         out << "  movq (%rax), %rax\n";
 
     // Accesos a arreglos: a[i]
+    // Si hay subscript, la variable base es un puntero → cargar su valor primero
     for (size_t i = 0; i < lval->dimAccesses.size(); ++i)
     {
+        if (!lval->dimAccesses[i].empty())
+            out << "  movq (%rax), %rax\n";  // seguir el puntero base
+
         for (auto expr : lval->dimAccesses[i])
         {
             out << "  pushq %rax\n";
@@ -464,12 +526,28 @@ int GenCodeVisitor::visit(AssignStm *stm)
     return 0;
 }
 
+int GenCodeVisitor::visit(CallStm *stm)
+{
+    stm->call->accept(this);  // resultado en %rax (ignorado)
+    return 0;
+}
+
 int GenCodeVisitor::visit(PrintfStm *stm)
 {
-    stm->e->accept(this);                               // valor en %rax
-    out << "  movq %rax, %rsi\n";                       // segundo argumento de printf
-    out << "  leaq print_val_fmt(%rip), %rdi\n";        // formato "%ld\n"
-    out << "  movq $0, %rax\n";                         // sin registros xmm
+    // Detectar si la expresión es string para elegir el formato correcto
+    bool isString = false;
+    if (auto *lval = dynamic_cast<LValueNode *>(stm->e))
+        isString = stringVars.count(lval->memberIds[0]) > 0;
+    else if (dynamic_cast<StringLiteralExp *>(stm->e))
+        isString = true;
+
+    stm->e->accept(this);                               // valor/dirección en %rax
+    out << "  movq %rax, %rsi\n";
+    if (isString)
+        out << "  leaq print_str_fmt(%rip), %rdi\n";   // formato "%s\n"
+    else
+        out << "  leaq print_val_fmt(%rip), %rdi\n";   // formato "%ld\n"
+    out << "  movq $0, %rax\n";
     out << "  call printf\n";
     return 0;
 }
@@ -581,6 +659,32 @@ int GenCodeVisitor::visit(ForStm *stm)
 
 int GenCodeVisitor::visit(BinaryExp *exp)
 {
+    // Constant folding: si ambos operandos son literales, calcular en compilación
+    auto *lNum = dynamic_cast<NumberExp *>(exp->left);
+    auto *rNum = dynamic_cast<NumberExp *>(exp->right);
+    if (lNum && rNum)
+    {
+        long long l = lNum->value, r = rNum->value, res = 0;
+        switch (exp->op)
+        {
+        case PLUS_OP:  res = l + r; break;
+        case MINUS_OP: res = l - r; break;
+        case MUL_OP:   res = l * r; break;
+        case DIV_OP:   res = (r != 0) ? l / r : 0; break;
+        case LT_OP:    res = l < r;  break;
+        case LE_OP:    res = l <= r; break;
+        case GT_OP:    res = l > r;  break;
+        case GE_OP:    res = l >= r; break;
+        case EQ_OP:    res = l == r; break;
+        case NE_OP:    res = l != r; break;
+        case AND_OP:   res = l && r; break;
+        case OR_OP:    res = l || r; break;
+        default: break;
+        }
+        out << "  movq $" << res << ", %rax\n";
+        return 0;
+    }
+
     if (exp->op == AND_OP)
     {
         exp->left->accept(this);
@@ -602,11 +706,39 @@ int GenCodeVisitor::visit(BinaryExp *exp)
         return 0;
     }
 
-    exp->left->accept(this);
-    out << "  pushq %rax\n";
-    exp->right->accept(this);
-    out << "  movq %rax, %rcx\n";
-    out << "  popq %rax\n";
+    // -------------------------------------------------------------------------
+    // Sethi-Ullman: evaluar primero el subárbol con mayor peso para minimizar
+    // el número de registros / accesos al stack.
+    // -------------------------------------------------------------------------
+    int labelL = sethiUllmanLabel(exp->left);
+    int labelR = sethiUllmanLabel(exp->right);
+    bool evalRightFirst = (labelR > labelL);
+
+    // Operaciones no conmutativas: el orden de operandos en %rax/%rcx importa
+    bool nonCommutative = (exp->op != PLUS_OP && exp->op != MUL_OP &&
+                           exp->op != EQ_OP   && exp->op != NE_OP);
+
+    if (evalRightFirst)
+    {
+        // Subárbol derecho más pesado → evaluar primero
+        suReorders++;
+        exp->right->accept(this);       // right → %rax
+        out << "  pushq %rax\n";
+        exp->left->accept(this);        // left  → %rax
+        out << "  movq %rax, %rcx\n";  // left  → %rcx
+        out << "  popq %rax\n";        // right → %rax  (rax=right, rcx=left)
+        if (nonCommutative)
+            out << "  xchgq %rax, %rcx\n"; // rax=left, rcx=right (orden correcto)
+    }
+    else
+    {
+        // Orden estándar: subárbol izquierdo primero
+        exp->left->accept(this);        // left  → %rax
+        out << "  pushq %rax\n";
+        exp->right->accept(this);       // right → %rax
+        out << "  movq %rax, %rcx\n";  // right → %rcx
+        out << "  popq %rax\n";        // left  → %rax  (rax=left, rcx=right)
+    }
 
     switch (exp->op)
     {

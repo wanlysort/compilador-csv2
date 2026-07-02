@@ -11,11 +11,13 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <stack>
 #include "environment.h"
 
 // ---- Forward Declarations del AST ----
+class Exp;
 class Program;
 class StructDec;
 class FunDec;
@@ -29,6 +31,7 @@ class LValueNode;
 // Sentencias
 class AssignStm;
 class PrintfStm;
+class CallStm;
 class ReturnStm;
 class IfStm;
 class WhileStm;
@@ -65,6 +68,7 @@ public:
     // Sentencias
     virtual int visit(AssignStm *stm) = 0;
     virtual int visit(PrintfStm *stm) = 0;
+    virtual int visit(CallStm *stm) = 0;
     virtual int visit(ReturnStm *stm) = 0;
     virtual int visit(IfStm *stm) = 0;
     virtual int visit(WhileStm *stm) = 0;
@@ -112,6 +116,7 @@ public:
 
     int visit(AssignStm *stm) override;
     int visit(PrintfStm *stm) override;
+    int visit(CallStm *stm) override;
     int visit(ReturnStm *stm) override;
     int visit(IfStm *stm) override;
     int visit(WhileStm *stm) override;
@@ -141,9 +146,11 @@ public:
     std::unordered_map<std::string, int> funcontador;   // Copia local de los tamaños de frame calculados
     std::unordered_map<std::string, int> memoria;       // Variable local -> Offset de bytes relativos a (%rbp)
     std::unordered_map<std::string, bool> memoriaGlobal; // Set dinámico de variables alojadas en .data
+    std::unordered_set<std::string> stringVars;          // Variables declaradas con tipo string
 
     int offset = -8;             // Próximo slot disponible en bytes para variables de 64 bits
     int labelcont = 0;           // Generador incremental de etiquetas únicas para saltos condicionales
+    int suReorders = 0;          // Contador de reordenamientos Sethi-Ullman aplicados
     bool entornoFuncion = false; // Flag de contexto para decidir direccionamiento (%rip) vs (%rbp)
     std::string nombreFuncion;   // Identificador de la rutina en procesamiento para los epílogos
 
@@ -152,6 +159,9 @@ public:
 
     // Helper — emite código que deja la DIRECCIÓN del lvalue en %rax (sin deref)
     void genLValueAddr(LValueNode *lval);
+
+    // Sethi-Ullman — calcula cuántos registros necesita un subárbol (peso)
+    int sethiUllmanLabel(Exp *exp);
 
     // Punto de entrada para la fase de Síntesis
     int generar(Program *program);
@@ -169,6 +179,7 @@ public:
 
     int visit(AssignStm *stm) override;
     int visit(PrintfStm *stm) override;
+    int visit(CallStm *stm) override;
     int visit(ReturnStm *stm) override;
     int visit(IfStm *stm) override;
     int visit(WhileStm *stm) override;

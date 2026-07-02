@@ -236,6 +236,15 @@ public:
     ~PrintfStm();
 };
 
+class CallStm : public Stm
+{
+public:
+    CallExp *call;
+    CallStm(CallExp *c);
+    int accept(Visitor *visitor) override;
+    ~CallStm();
+};
+
 class ReturnStm : public Stm
 {
 public:
