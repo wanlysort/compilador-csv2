@@ -1,0 +1,12 @@
+int main() {
+    int edad = 20;
+
+    if (edad >= 18) {
+        printf("Mayor", 1);
+    }
+    else {
+        printf("Menor", 0);
+    }
+
+    return 0;
+}

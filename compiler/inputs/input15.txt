@@ -1,0 +1,26 @@
+struct Persona {
+    int edad;
+};
+
+int sumar(int a, int b) {
+    return a + b;
+}
+
+int main() {
+
+    Persona p;
+
+    p.edad = 20;
+
+    int total = 0;
+
+    for(int i=1; i<=5; i++) {
+        total = total + i;
+    }
+
+    if(total > 10) {
+        total = sumar(total,p.edad);
+    }
+
+    return total;
+}

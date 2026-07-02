@@ -1,0 +1,14 @@
+---
+:id: 416608878
+:submitters:
+- :name: Camila Del Rosario Espinoza Cabrera
+  :email: camila.espinoza@utec.edu.pe
+- :name: Marco Wanly Obregón Casique
+  :email: marco.obregon@utec.edu.pe
+:created_at: !ruby/object:ActiveSupport::TimeWithZone
+  utc: 2026-06-11 13:48:21.741026000 Z
+  zone: !ruby/object:ActiveSupport::TimeZone
+    name: America/Los_Angeles
+  time: 2026-06-11 06:48:21.741026000 Z
+:status: processed
+:score: 14.0

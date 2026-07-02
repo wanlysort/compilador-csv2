@@ -1,0 +1,12 @@
+int sumar(int a, int b) {
+    return a + b;
+}
+
+int main() {
+
+    int resultado = sumar(10, 20);
+
+    printf("Resultado", resultado);
+
+    return 0;
+}

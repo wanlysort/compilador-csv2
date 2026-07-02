@@ -1,0 +1,14 @@
+struct Persona {
+    int edad;
+};
+
+int main() {
+
+    Persona p;
+
+    p.edad = 25;
+
+    printf("Edad", p.edad);
+
+    return 0;
+}

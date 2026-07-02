@@ -1,0 +1,436 @@
+/* =============================================================================
+   App.css — Tema oscuro estilo VS Code para el CS# Compiler IDE
+   ============================================================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-size: 13px;
+}
+
+/* =============================================================================
+   Layout
+   ============================================================================= */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   Header
+   ============================================================================= */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  height: 48px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.logo {
+  font-size: 20px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #858585;
+  background: #3e3e42;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* =============================================================================
+   Toolbar
+   ============================================================================= */
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-compile {
+  background: #0e639c;
+  color: #fff;
+}
+.btn-compile:hover:not(:disabled) { background: #1177bb; }
+
+.btn-run {
+  background: #388a34;
+  color: #fff;
+}
+.btn-run:hover:not(:disabled) { background: #4aaa45; }
+
+.btn-clear {
+  background: #3e3e42;
+  color: #d4d4d4;
+}
+.btn-clear:hover:not(:disabled) { background: #505050; }
+
+/* =============================================================================
+   Status bar
+   ============================================================================= */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.status-idle    { color: #858585; }
+.status-loading { color: #dcdcaa; }
+.status-ok      { color: #4ec9b0; }
+.status-error   { color: #f44747; }
+
+.spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #dcdcaa;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+   Editor panel
+   ============================================================================= */
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  width: 50%;
+  min-width: 300px;
+  border-right: 1px solid #3e3e42;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #252526;
+  border-bottom: 1px solid #3e3e42;
+  font-size: 12px;
+  color: #cccccc;
+  flex-shrink: 0;
+}
+
+.panel-hint {
+  color: #858585;
+  font-size: 10px;
+  background: #3e3e42;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.editor-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   Divider
+   ============================================================================= */
+
+.divider {
+  width: 3px;
+  background: #3e3e42;
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   Output panel
+   ============================================================================= */
+
+.output-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   Tabs
+   ============================================================================= */
+
+.tabs {
+  display: flex;
+  background: #252526;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.tab {
+  position: relative;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: #858585;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover { color: #cccccc; background: #2a2a2a; }
+
+.tab-active {
+  color: #ffffff;
+  border-bottom: 2px solid #007acc;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #f44747;
+  color: #fff;
+  font-size: 9px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-content {
+  flex: 1;
+  overflow: auto;
+  background: #1e1e1e;
+}
+
+/* =============================================================================
+   Empty state
+   ============================================================================= */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #555;
+  gap: 10px;
+}
+
+.empty-icon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.empty-state p {
+  font-size: 13px;
+}
+
+/* =============================================================================
+   Assembly viewer
+   ============================================================================= */
+
+.assembly-viewer {
+  height: 100%;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.asm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+}
+
+.asm-lineno {
+  color: #555;
+  text-align: right;
+  padding: 0 12px 0 8px;
+  user-select: none;
+  width: 40px;
+  border-right: 1px solid #3e3e42;
+}
+
+.asm-code {
+  padding: 1px 12px;
+  white-space: pre;
+}
+
+.asm-directive .asm-code { color: #569cd6; }
+.asm-label .asm-code     { color: #4ec9b0; font-weight: 600; }
+.asm-comment .asm-code   { color: #6a9955; font-style: italic; }
+.asm-instr .asm-code     { color: #d4d4d4; }
+
+.asm-line:hover { background: #2a2a2a; }
+
+/* =============================================================================
+   AST Viewer
+   ============================================================================= */
+
+.ast-viewer {
+  padding: 12px 8px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 12.5px;
+  overflow: auto;
+  height: 100%;
+}
+
+.ast-node {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1.6;
+}
+
+.ast-node:hover { background: #2a2a2a; }
+
+.ast-toggle {
+  font-size: 10px;
+  color: #555;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.ast-leaf { color: #3e3e42 !important; }
+
+.ast-label {
+  font-weight: 500;
+}
+
+.ast-meta {
+  color: #6a9955;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.ast-children {
+  margin-left: 16px;
+  border-left: 1px solid #3e3e42;
+  padding-left: 4px;
+}
+
+/* =============================================================================
+   Output panel
+   ============================================================================= */
+
+.output-viewer {
+  padding: 12px 16px;
+  height: 100%;
+  overflow: auto;
+}
+
+.output-badge {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.output-ok   .output-badge { color: #4ec9b0; }
+.output-err  .output-badge { color: #f44747; }
+
+.output-text {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  background: #252526;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #3e3e42;
+}
+
+/* =============================================================================
+   Messages panel
+   ============================================================================= */
+
+.messages-panel {
+  height: 100%;
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.messages-text {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: #ce9178;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* =============================================================================
+   Scrollbar personalizada
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track { background: #1e1e1e; }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
