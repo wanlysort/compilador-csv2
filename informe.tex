@@ -1,0 +1,1365 @@
+% =============================================================================
+% Informe Tecnico - Compilador CS# con Generacion de Codigo x86-64
+% CS3402 Compiladores - UTEC 2026-1
+% =============================================================================
+
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{mdframed}
+\usepackage{tcolorbox}
+
+\geometry{left=3cm, right=3cm, top=3cm, bottom=3cm}
+
+% ---- Colores ----
+\definecolor{codegreen}{rgb}{0.1,0.5,0.1}
+\definecolor{codegray}{rgb}{0.4,0.4,0.4}
+\definecolor{codepurple}{rgb}{0.5,0,0.7}
+\definecolor{backcolour}{rgb}{0.96,0.96,0.94}
+\definecolor{backasm}{rgb}{0.94,0.96,0.96}
+\definecolor{darkblue}{rgb}{0,0,0.55}
+\definecolor{darkred}{rgb}{0.55,0,0}
+
+% ---- Estilo para C++ ----
+\lstdefinestyle{cppstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{darkblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=6pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{gray},
+    xleftmargin=8pt
+}
+
+% ---- Estilo para Assembly AT&T ----
+\lstdefinestyle{asmstyle}{
+    backgroundcolor=\color{backasm},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{darkred}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=6pt,
+    frame=single,
+    rulecolor=\color{gray},
+    xleftmargin=8pt,
+    morecomment=[l]{\#},
+    morecomment=[l]{//}
+}
+
+% ---- Estilo para gramatica / texto plano ----
+\lstdefinestyle{grammarstyle}{
+    backgroundcolor=\color{backcolour},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    frame=single,
+    rulecolor=\color{gray},
+    xleftmargin=8pt
+}
+
+% ---- Estilo para CS# (codigo fuente del lenguaje) ----
+\lstdefinestyle{csstyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen}\itshape,
+    keywordstyle=\color{darkblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=6pt,
+    frame=single,
+    rulecolor=\color{gray},
+    xleftmargin=8pt,
+    morekeywords={int, string, bool, auto, struct, if, else, while, for, do,
+                  return, printf, true, false}
+}
+
+\lstset{style=cppstyle}
+
+% ---- Encabezado y pie de pagina ----
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{CS3402 Compiladores -- UTEC 2026-1}
+\lhead{Compilador CS\#}
+\rfoot{\thepage}
+\lfoot{Espinoza, Obregon}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=darkblue,
+    urlcolor=darkblue,
+    citecolor=darkblue
+}
+
+% =============================================================================
+\begin{document}
+
+% ---- Portada ----
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+
+    {\Large \textbf{Universidad de Ingenieria y Tecnologia -- UTEC}}\\[0.4cm]
+    {\large Departamento de Ciencias de la Computacion}\\[0.4cm]
+    {\large CS3402 -- Compiladores}\\[1.5cm]
+
+    \rule{\linewidth}{0.5mm}\\[0.6cm]
+    {\LARGE \textbf{Proyecto 3: Diseno e Implementacion de un}}\\[0.3cm]
+    {\LARGE \textbf{Compilador x86 con Optimizacion}}\\[0.3cm]
+    {\LARGE \textbf{y Evaluacion Comparativa}}\\[0.3cm]
+    \rule{\linewidth}{0.5mm}\\[2cm]
+
+    {\large \textbf{Integrantes:}}\\[0.5cm]
+    {\large Camila Del Rosario Espinoza Cabrera}\\[0.2cm]
+    {\large Marco Wanly Obregon Casique}\\[2cm]
+
+    {\large \textbf{Docente:}} \\[0.3cm]
+    {\large Curso de Compiladores}\\[2cm]
+
+    {\large Semestre 2026-1}\\[0.5cm]
+    {\large \today}
+
+    \vfill
+\end{titlepage}
+
+% ---- Tabla de contenidos ----
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Introduccion}
+% =============================================================================
+
+En este proyecto implementamos un compilador completo para un lenguaje llamado \textbf{CS\#}, que es un subconjunto simplificado de C\#. El compilador toma codigo fuente escrito en CS\# y produce codigo ensamblador x86-64 en sintaxis AT\&T que luego puede ser ensamblado y ejecutado en sistemas Linux de 64 bits.
+
+El proyecto tiene tres componentes principales que trabajan juntos:
+
+\begin{itemize}
+    \item \textbf{El compilador} (escrito en C++): es el nucleo del proyecto. Lee el codigo fuente CS\#, lo transforma en un arbol sintactico y finalmente genera codigo ensamblador x86-64.
+    \item \textbf{El backend} (escrito en Python con FastAPI): expone el compilador como un servicio web, permitiendo compilar codigo y recibir el AST o el codigo ensamblador como respuesta.
+    \item \textbf{El frontend} (escrito en React con Vite): una interfaz web tipo IDE donde el usuario puede escribir codigo CS\#, compilarlo y ver el resultado directamente en el navegador.
+\end{itemize}
+
+El compilador implementa el patron de diseno \textbf{Visitor} sobre el arbol de sintaxis abstracta, lo que permite separar claramente las distintas fases de compilacion sin modificar la estructura del AST.
+
+Ademas de la generacion de codigo basica, implementamos tres optimizaciones que se aplican automaticamente durante la compilacion: plegado de constantes, optimizacion de mirilla y el algoritmo de Sethi-Ullman para reordenar operandos.
+
+\newpage
+
+% =============================================================================
+\section{Descripcion del Lenguaje CS\#}
+% =============================================================================
+
+CS\# es un lenguaje imperativo tipado estaticamente que incluye las siguientes caracteristicas:
+
+\begin{itemize}
+    \item Tipos primitivos: \texttt{int}, \texttt{string}, \texttt{bool}
+    \item Tipo inferido: \texttt{auto} (el compilador asume 8 bytes)
+    \item Tipos compuestos: structs, punteros (\texttt{int*}, \texttt{int**}), arreglos
+    \item Funciones con parametros y valor de retorno
+    \item Funciones genericas con parametro de tipo \texttt{<T>}
+    \item Control de flujo: \texttt{if/else if/else}, \texttt{while}, \texttt{for}, \texttt{do-while}
+    \item Salida por consola con \texttt{printf}
+    \item Manejo de memoria dinamica con \texttt{malloc} y \texttt{free}
+    \item Funciones lambda (funciones anonimas de primera clase)
+\end{itemize}
+
+\subsection{Gramatica formal del lenguaje}
+
+A continuacion se muestra la gramatica del lenguaje en notacion BNF. Los corchetes \texttt{[ ]} indican opcionalidad y los parentesis con asterisco \texttt{( )*} indican repeticion de cero o mas veces.
+
+\begin{lstlisting}[style=grammarstyle, caption={Gramatica completa de CS\#}]
+Program       ::= (StructDec)* (FunDec)*
+
+StructDec     ::= struct id { (Type id ;)* } [;]
+
+FunDec        ::= [ < id > ] Type id ( [ParamDecList] ) { Body }
+ParamDecList  ::= Type id (, Type id)*
+
+VarDec        ::= Type VarList ;
+VarList       ::= Var (, Var)*
+Var           ::= id DimList [= InitValue]
+DimList       ::= ([ Num ])*
+InitValue     ::= AExp | { InitValue (, InitValue)* }
+
+Type          ::= BaseType ( * )*
+BaseType      ::= int | string | bool | auto | id [ < Type > ]
+
+Body          ::= (VarDec | Stmt)*
+
+Stmt          ::= for ( Type id = CExp ; CExp ; id (++ | --) ) { Body }
+               | while ( AExp ) { Body }
+               | if ( AExp ) { Body } (else if (AExp) { Body })* [else { Body }]
+               | do { Body } while ( AExp ) ;
+               | return AExp ;
+               | printf ( StringLiteral , AExp ) ;
+               | id ( [ArgList] ) ;
+               | LValue = AExp ;
+
+LValue        ::= ( * )* id DimAccess ( . id DimAccess )*
+DimAccess     ::= ([ AExp ])*
+
+AExp          ::= BExp [ ( && | || ) BExp ]
+BExp          ::= CExp | ! ( CExp )
+CExp          ::= Exp [ ( < | <= | == | > | >= | != ) Exp ]
+Exp           ::= Term ( ( + | - ) Term )*
+Term          ::= Factor ( ( * | / ) Factor )*
+Factor        ::= id ( [ArgList] )
+               | LValue
+               | & id
+               | Num | Bool | StringLiteral
+               | LambdaDec
+               | ( AExp )
+
+ArgList       ::= AExp (, AExp)*
+LambdaDec     ::= ( [ParamDecList] ) => { Body }
+\end{lstlisting}
+
+\subsection{Ejemplo de codigo CS\#}
+
+El siguiente ejemplo muestra varias caracteristicas del lenguaje en uso:
+
+\begin{lstlisting}[style=csstyle, caption={Ejemplo de programa CS\# con fibonacci}]
+int fibonacci(int n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+int main() {
+    int i = 0;
+    for (int i = 0; i < 10; i++) {
+        int resultado = fibonacci(i);
+        printf("%ld", resultado);
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Arquitectura del Compilador}
+% =============================================================================
+
+El compilador sigue un flujo de compilacion clasico dividido en fases bien definidas. Cada fase toma la salida de la anterior y produce una representacion mas cercana al codigo maquina.
+
+\begin{lstlisting}[style=grammarstyle, caption={Pipeline del compilador}]
+Codigo fuente (.fun)
+        |
+        v
+   [Scanner]  ---- Analisis lexico, produce tokens
+        |
+        v
+   [Parser]   ---- Analisis sintactico, produce AST
+        |
+        v
+ [TypeChecker] --- Analisis semantico (via Visitor)
+        |
+        v
+ [GenCodeVisitor] - Generacion de codigo x86-64 AT&T
+        |
+        v
+  [Peephole Opt] - Optimizacion post-generacion
+        |
+        v
+   Archivo .s  ---- Ensamblador listo para gcc/as
+\end{lstlisting}
+
+Los archivos principales del proyecto son:
+
+\begin{itemize}
+    \item \texttt{scanner.h / scanner.cpp}: el analizador lexico
+    \item \texttt{token.h / token.cpp}: definicion de los tipos de tokens
+    \item \texttt{parser.h / parser.cpp}: el analizador sintactico
+    \item \texttt{ast.h / ast.cpp}: definicion e implementacion de los nodos del AST
+    \item \texttt{visitor.h / visitor.cpp}: los visitantes (TypeChecker y GenCodeVisitor)
+    \item \texttt{environment.h}: tabla de simbolos con soporte para multiples niveles de scope
+    \item \texttt{main.cpp}: punto de entrada, orquesta todo el proceso
+    \item \texttt{ast\_printer.h / ast\_printer.cpp}: imprime el AST como JSON (para el modo --ast)
+\end{itemize}
+
+\newpage
+
+% =============================================================================
+\section{Analisis Lexico (Scanner)}
+% =============================================================================
+
+El scanner recorre el codigo fuente caracter por caracter y produce una secuencia de \textbf{tokens}. Cada token tiene un tipo y un texto asociado.
+
+Los tipos de tokens que reconoce el scanner incluyen:
+
+\begin{itemize}
+    \item \textbf{Palabras clave}: \texttt{int}, \texttt{string}, \texttt{bool}, \texttt{auto}, \texttt{struct}, \texttt{if}, \texttt{else}, \texttt{while}, \texttt{for}, \texttt{do}, \texttt{return}, \texttt{printf}, \texttt{true}, \texttt{false}
+    \item \textbf{Identificadores}: cualquier secuencia que empiece con letra o guion bajo
+    \item \textbf{Literales numericos}: secuencias de digitos
+    \item \textbf{Literales de cadena}: texto entre comillas dobles
+    \item \textbf{Operadores aritmeticos}: \texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}
+    \item \textbf{Operadores relacionales}: \texttt{<}, \texttt{<=}, \texttt{==}, \texttt{>}, \texttt{>=}, \texttt{!=}
+    \item \textbf{Operadores logicos}: \texttt{\&\&}, \texttt{||}, \texttt{!}
+    \item \textbf{Operadores especiales}: \texttt{\&} (address-of), \texttt{++}, \texttt{--}, \texttt{=>} (flecha lambda)
+    \item \textbf{Delimitadores}: \texttt{(}, \texttt{)}, \texttt{\{}, \texttt{\}}, \texttt{[}, \texttt{]}, \texttt{;}, \texttt{,}, \texttt{.}
+\end{itemize}
+
+El parser utiliza un lookahead de dos tokens (el token actual y el siguiente) para tomar decisiones de parsing sin necesidad de retroceder.
+
+\newpage
+
+% =============================================================================
+\section{Analisis Sintactico (Parser)}
+% =============================================================================
+
+El parser implementa un \textbf{analizador descendente recursivo} (recursive descent). Cada regla gramatical tiene una funcion correspondiente en el parser que la implementa directamente.
+
+\subsection{Estructura general del parser}
+
+El parser mantiene tres punteros a tokens: \texttt{previous} (el ultimo consumido), \texttt{current} (el token actual) y \texttt{next} (el siguiente, para lookahead de dos tokens).
+
+Las funciones primitivas mas importantes son:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Funciones primitivas del parser}]
+// Verifica si el token actual es del tipo dado
+bool Parser::check(Token::Type ttype) {
+    if (isAtEnd()) return false;
+    return current->type == ttype;
+}
+
+// Consume el token actual si es del tipo dado
+bool Parser::match(Token::Type ttype) {
+    if (check(ttype)) { advance(); return true; }
+    return false;
+}
+
+// Consume el token o lanza error si no coincide
+void Parser::expect(Token::Type ttype) {
+    if (!match(ttype))
+        error(Token::typeName(ttype));
+}
+\end{lstlisting}
+
+\subsection{Discriminacion entre declaraciones y sentencias}
+
+Uno de los desafios del parser es distinguir si al inicio de un bloque viene una declaracion de variable o una sentencia. Para esto usamos una funcion auxiliar:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Deteccion de declaracion de variable}]
+bool Parser::looksLikeVarDeclaration() {
+    // Si empieza con un tipo primitivo, es VarDec
+    if (check(Token::INT_TYPE)) return true;
+    if (check(Token::STRING_TYPE)) return true;
+    if (check(Token::BOOL_TYPE)) return true;
+    // Si es "id id" (tipo struct seguido de nombre), es VarDec
+    if (current->type == Token::ID &&
+        next != nullptr &&
+        next->type == Token::ID)
+        return true;
+    return false;
+}
+\end{lstlisting}
+
+\subsection{Parsing de sentencias}
+
+La funcion \texttt{parseStm()} maneja todos los tipos de sentencias. Una decision importante fue distinguir entre una llamada a funcion como sentencia (como \texttt{free(p);}) y una asignacion (como \texttt{x = 5;}). Esto se resuelve mirando el lookahead de dos tokens:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Deteccion de CallStm vs AssignStm}]
+// Si el token actual es un identificador y el siguiente es '(',
+// es una llamada a funcion como sentencia
+if (check(Token::ID) && next != nullptr
+    && next->type == Token::LPAREN) {
+    std::string fname = current->text;
+    advance(); // consume ID
+    advance(); // consume (
+    std::vector<Exp*> args;
+    if (!check(Token::RPAREN)) {
+        args.push_back(parseAExp());
+        while (match(Token::COMA))
+            args.push_back(parseAExp());
+    }
+    expect(Token::RPAREN);
+    expect(Token::SEMICOL);
+    return new CallStm(new CallExp(fname, args));
+}
+// En cualquier otro caso con ID, es una asignacion
+LValueNode* target = parseLValue();
+expect(Token::ASSIGN);
+Exp* e = parseAExp();
+expect(Token::SEMICOL);
+return new AssignStm(target, e);
+\end{lstlisting}
+
+\subsection{Parsing de expresiones con precedencia}
+
+La jerarquia de expresiones se implementa con funciones anidadas donde cada nivel llama al nivel de mayor precedencia:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Jerarquia de expresiones}]
+// Nivel mas bajo: operadores logicos && y ||
+Exp* Parser::parseAExp() {
+    Exp* l = parseBExp();
+    if (check(Token::AND_OP) || check(Token::OR_OP)) {
+        advance();
+        BinaryOp op = (previous->type == Token::AND_OP)
+                      ? AND_OP : OR_OP;
+        Exp* r = parseBExp();
+        l = new BinaryExp(l, r, op);
+    }
+    return l;
+}
+
+// Nivel intermedio: comparaciones
+Exp* Parser::parseCExp() {
+    Exp* l = parseExp();
+    if (check(Token::LT_OP) || check(Token::LE_OP) ||
+        check(Token::EQ_OP) || check(Token::GT_OP) ||
+        check(Token::GE_OP) || check(Token::NE_OP)) {
+        advance();
+        // ... seleccionar operador y parsear lado derecho
+    }
+    return l;
+}
+
+// Nivel aritmetico: suma y resta
+Exp* Parser::parseExp() {
+    Exp* l = parseTerm();
+    while (match(Token::PLUS) || match(Token::MINUS)) {
+        BinaryOp op = (previous->type == Token::PLUS)
+                      ? PLUS_OP : MINUS_OP;
+        l = new BinaryExp(l, parseTerm(), op);
+    }
+    return l;
+}
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Arbol de Sintaxis Abstracta (AST)}
+% =============================================================================
+
+El AST es la representacion intermedia principal del compilador. Cada construccion del lenguaje tiene una clase C++ correspondiente que hereda de una clase base.
+
+\subsection{Jerarquia de clases}
+
+La jerarquia principal es:
+
+\begin{lstlisting}[style=grammarstyle, caption={Jerarquia del AST}]
+Program
+  |- sdlist: vector<StructDec*>
+  |- vdlist: vector<VarDec*>
+  |- fdlist: vector<FunDec*>
+
+Stm (abstracta)
+  |- AssignStm   (LValueNode*, Exp*)
+  |- PrintfStm   (string formato, Exp*)
+  |- CallStm     (CallExp*)
+  |- ReturnStm   (Exp*)
+  |- IfStm       (conditions, branches, elseBranch)
+  |- WhileStm    (Exp* condition, Body*)
+  |- DoWhileStm  (Body*, Exp* condition)
+  |- ForStm      (Type, id, init, cond, update, Body*)
+
+Exp (abstracta)
+  |- BinaryExp   (Exp* left, Exp* right, BinaryOp)
+  |- UnaryExp    (Exp* operand, UnaryOp)
+  |- NumberExp   (int value)
+  |- BoolExp     (bool value)
+  |- StringLiteralExp (string value)
+  |- LambdaDecExp     (params, Body*)
+  |- CallExp     (string funcName, vector<Exp*> args)
+  |- LValueNode  (int ptrLevel, ids, dimAccesses)
+\end{lstlisting}
+
+\subsection{Patron Visitor}
+
+Todos los nodos implementan el metodo \texttt{accept(Visitor*)} que invoca el metodo \texttt{visit} correspondiente del visitante. Esto permite agregar nuevas operaciones sobre el AST sin modificar las clases de los nodos.
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Implementacion del patron Visitor en BinaryExp}]
+// En ast.h: declaracion
+class BinaryExp : public Exp {
+public:
+    Exp* left;
+    Exp* right;
+    BinaryOp op;
+    BinaryExp(Exp* l, Exp* r, BinaryOp o);
+    int accept(Visitor* visitor) override;
+};
+
+// En ast.cpp: implementacion
+int BinaryExp::accept(Visitor* visitor) {
+    return visitor->visit(this);
+}
+\end{lstlisting}
+
+La clase base \texttt{Visitor} declara un metodo \texttt{visit} puro para cada tipo de nodo, obligando a que todos los visitantes concretos los implementen:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Interfaz del Visitor}]
+class Visitor {
+public:
+    virtual int visit(Program* p) = 0;
+    virtual int visit(FunDec* fd) = 0;
+    virtual int visit(BinaryExp* exp) = 0;
+    virtual int visit(AssignStm* stm) = 0;
+    virtual int visit(CallStm* stm) = 0;
+    // ... un metodo por cada tipo de nodo
+};
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Analisis Semantico (TypeChecker)}
+% =============================================================================
+
+El \texttt{TypeCheckerVisitor} recorre el AST y realiza las siguientes verificaciones:
+
+\begin{itemize}
+    \item Que todas las variables usadas hayan sido declaradas
+    \item Que las funciones llamadas existan y reciban el numero correcto de argumentos
+    \item Cuenta las variables locales de cada funcion para calcular el tamano del stack frame
+\end{itemize}
+
+\subsection{Tabla de simbolos}
+
+Usamos una clase \texttt{Environment} que maneja multiples niveles de scope (alcance). Cuando se entra a un bloque (funcion, if, while, etc.) se agrega un nivel, y cuando se sale se elimina. Esto permite que variables locales de un bloque no sean visibles fuera de el.
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Manejo de scopes en el TypeChecker}]
+int TypeCheckerVisitor::visit(FunDec* fd) {
+    funcionActual = fd->nombre;
+    locales = 0;
+    int parametros = fd->paramNames.size();
+
+    entorno.add_level(); // abrir scope de funcion
+
+    // Registrar parametros formales en el scope
+    for (size_t i = 0; i < fd->paramNames.size(); ++i)
+        entorno.add_var(fd->paramNames[i], 0);
+
+    fd->cuerpo->accept(this); // analizar el cuerpo
+
+    entorno.remove_level(); // cerrar scope
+
+    // Guardar cuantas variables tiene esta funcion
+    // (parametros + locales declaradas)
+    funcontador[fd->nombre] = parametros + locales;
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Validacion de llamadas a funcion}
+
+El TypeChecker tiene una lista de funciones externas permitidas de la libreria estandar de C (como \texttt{malloc}, \texttt{free}, \texttt{printf}). Si se llama a una funcion que no esta declarada ni en esta lista, se lanza un error.
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Validacion de llamadas a funcion}]
+int TypeCheckerVisitor::visit(CallExp* exp) {
+    static const std::unordered_set<std::string> externFuncs = {
+        "malloc", "free", "printf", "scanf",
+        "strlen", "strcpy", "strcat"
+    };
+
+    bool esFuncionDeclarada =
+        funAridad.find(exp->functionName) != funAridad.end();
+    bool esVariableLocal = entorno.check(exp->functionName);
+    bool esFuncionExterna = externFuncs.count(exp->functionName) > 0;
+
+    if (!esFuncionDeclarada && !esVariableLocal && !esFuncionExterna)
+        throw std::runtime_error(
+            "[TypeChecker] Funcion no declarada: '"
+            + exp->functionName + "'");
+
+    // Si es funcion declarada, verificar aridad
+    if (esFuncionDeclarada) {
+        int esperados = funAridad[exp->functionName];
+        if ((int)exp->args.size() != esperados)
+            throw std::runtime_error(
+                "Cantidad incorrecta de argumentos para '"
+                + exp->functionName + "'");
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Generacion de Codigo x86-64}
+% =============================================================================
+
+El \texttt{GenCodeVisitor} recorre el AST una segunda vez y emite codigo ensamblador x86-64 en sintaxis AT\&T directamente a un stream de salida. Esta es la fase mas compleja del compilador.
+
+\subsection{Convencion de llamada (ABI System V AMD64)}
+
+Seguimos la convencion de llamada estandar de Linux de 64 bits (System V AMD64 ABI):
+
+\begin{itemize}
+    \item Los primeros 6 argumentos de una funcion se pasan en los registros \texttt{\%rdi}, \texttt{\%rsi}, \texttt{\%rdx}, \texttt{\%rcx}, \texttt{\%r8}, \texttt{\%r9}
+    \item Si hay mas de 6 argumentos, los adicionales se pasan en el stack
+    \item El valor de retorno queda en \texttt{\%rax}
+    \item El stack debe estar alineado a 16 bytes antes de un \texttt{call}
+\end{itemize}
+
+\subsection{Estructura del stack frame}
+
+Cada funcion sigue este prologo y epilogo estandar:
+
+\begin{lstlisting}[style=asmstyle, caption={Stack frame de una funcion en x86-64}]
+# Prologo: crear el frame
+pushq %rbp          # guardar base pointer del llamador
+movq  %rsp, %rbp   # establecer nuevo base pointer
+subq  $N, %rsp      # reservar N bytes para variables locales
+
+# ... cuerpo de la funcion ...
+
+# Epilogo: destruir el frame y retornar
+.end_nombreFuncion:
+leave               # equivale a: movq %rbp, %rsp; popq %rbp
+ret                 # retornar al llamador
+\end{lstlisting}
+
+Donde \texttt{N} es el numero de variables locales (calculado por el TypeChecker) multiplicado por 8 bytes. Las variables locales se ubican en offsets negativos respecto a \texttt{\%rbp}: la primera en \texttt{-8(\%rbp)}, la segunda en \texttt{-16(\%rbp)}, y asi sucesivamente.
+
+\subsection{Generacion del prologo de funcion}
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Generacion de codigo para FunDec}]
+int GenCodeVisitor::visit(FunDec* f) {
+    entornoFuncion = true;
+    memoria.clear();
+    offset = -8;
+    nombreFuncion = f->nombre;
+
+    const std::vector<std::string> argRegs =
+        {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+
+    out << "\n.globl " << f->nombre << "\n";
+    out << f->nombre << ":\n";
+    out << "  pushq %rbp\n";
+    out << "  movq %rsp, %rbp\n";
+    // Reservar espacio para todos los parametros y variables locales
+    out << "  subq $" << funcontador[f->nombre] * 8 << ", %rsp\n";
+
+    // Guardar los parametros que llegan en registros al stack local
+    for (int i = 0; i < (int)f->paramNames.size(); i++) {
+        memoria[f->paramNames[i]] = offset;
+        if (i < 6)
+            out << "  movq " << argRegs[i] << ", "
+                << offset << "(%rbp)\n";
+        else {
+            // Argumentos 7+: vienen en el stack del llamador
+            int stackArgOffset = 16 + (i - 6) * 8;
+            out << "  movq " << stackArgOffset << "(%rbp), %rax\n";
+            out << "  movq %rax, " << offset << "(%rbp)\n";
+        }
+        offset -= 8;
+    }
+    f->cuerpo->accept(this);
+    out << ".end_" << f->nombre << ":\n";
+    out << "  leave\n";
+    out << "  ret\n";
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Acceso a variables: el helper genLValueAddr}
+
+Una de las decisiones de diseno mas importantes fue crear un helper \texttt{genLValueAddr()} que deja en \texttt{\%rax} la \textbf{direccion} de una variable (no su valor). Esto permite implementar tanto lecturas como escrituras de forma consistente.
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Helper genLValueAddr}]
+void GenCodeVisitor::genLValueAddr(LValueNode* lval) {
+    std::string baseId = lval->memberIds[0];
+
+    // Direccion base: diferente segun variable global o local
+    if (memoriaGlobal.count(baseId))
+        out << "  leaq " << baseId << "(%rip), %rax\n";
+    else
+        out << "  leaq " << memoria[baseId] << "(%rbp), %rax\n";
+
+    // Desreferencias de puntero: *p -> seguir la cadena de punteros
+    for (int d = 0; d < lval->dereferenceLevel; d++)
+        out << "  movq (%rax), %rax\n";
+
+    // Acceso a arreglo: a[i] -> calcular la direccion del elemento
+    for (size_t i = 0; i < lval->dimAccesses.size(); ++i) {
+        if (!lval->dimAccesses[i].empty())
+            out << "  movq (%rax), %rax\n"; // seguir puntero base
+        for (auto expr : lval->dimAccesses[i]) {
+            out << "  pushq %rax\n";
+            expr->accept(this);       // evaluar indice -> %rax
+            out << "  movq %rax, %rcx\n";
+            out << "  popq %rax\n";
+            out << "  shlq $3, %rcx\n"; // indice * 8 (desplazamiento)
+            out << "  addq %rcx, %rax\n";
+        }
+    }
+}
+\end{lstlisting}
+
+Para \textbf{leer} una variable se llama a \texttt{genLValueAddr} y luego se desreferencia:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Lectura de una variable (LValueNode como expresion)}]
+int GenCodeVisitor::visit(LValueNode* lval) {
+    genLValueAddr(lval);            // %rax = direccion de la variable
+    out << "  movq (%rax), %rax\n"; // %rax = valor de la variable
+    return 0;
+}
+\end{lstlisting}
+
+Para \textbf{escribir} (asignacion) se guarda primero la direccion y luego el valor:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Asignacion (AssignStm)}]
+int GenCodeVisitor::visit(AssignStm* stm) {
+    genLValueAddr(stm->target);    // %rax = direccion del destino
+    out << "  pushq %rax\n";       // guardar direccion en el stack
+    stm->e->accept(this);          // evaluar RHS -> %rax
+    out << "  popq %rcx\n";        // recuperar la direccion
+    out << "  movq %rax, (%rcx)\n"; // almacenar valor en el destino
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Generacion de expresiones binarias}
+
+Para evaluar una expresion binaria como \texttt{a + b}, el patron general es: evaluar el lado izquierdo (resultado en \texttt{\%rax}), guardarlo en el stack, evaluar el lado derecho (resultado en \texttt{\%rax}), recuperar el izquierdo en \texttt{\%rcx}, y aplicar la operacion.
+
+\begin{lstlisting}[style=asmstyle, caption={Ensamblador generado para "a + b"}]
+leaq -8(%rbp), %rax    # direccion de 'a'
+movq (%rax), %rax      # valor de 'a' -> %rax
+pushq %rax             # guardar 'a' en el stack
+leaq -16(%rbp), %rax   # direccion de 'b'
+movq (%rax), %rax      # valor de 'b' -> %rax
+movq %rax, %rcx        # 'b' -> %rcx
+popq %rax              # 'a' -> %rax
+addq %rcx, %rax        # resultado = a + b -> %rax
+\end{lstlisting}
+
+\subsection{Llamadas a funcion}
+
+Las llamadas a funcion siguen la ABI. Los argumentos se evaluan de derecha a izquierda y se guardan temporalmente en el stack, luego se cargan a los registros correspondientes:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Generacion de llamada a funcion}]
+int GenCodeVisitor::visit(CallExp* exp) {
+    const std::vector<std::string> argRegs =
+        {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
+    size_t nArgs = exp->args.size();
+
+    // Evaluar todos los args y guardarlos en el stack
+    for (int i = (int)nArgs - 1; i >= 0; i--) {
+        exp->args[i]->accept(this);
+        out << "  pushq %rax\n";
+    }
+
+    // Cargar los primeros 6 desde el stack a registros
+    size_t nReg = std::min(nArgs, argRegs.size());
+    for (size_t i = 0; i < nReg; i++)
+        out << "  popq " << argRegs[i] << "\n";
+
+    // Llamar a la funcion (directa o indirecta si es lambda)
+    if (funcontador.count(exp->functionName))
+        out << "  call " << exp->functionName << "\n";
+    else if (memoria.count(exp->functionName)) {
+        out << "  movq " << memoria[exp->functionName]
+            << "(%rbp), %rax\n";
+        out << "  call *%rax\n"; // llamada indirecta (lambda)
+    } else
+        out << "  call " << exp->functionName << "\n";
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Generacion de sentencias de control}
+
+\subsubsection{If / else if / else}
+
+\begin{lstlisting}[style=asmstyle, caption={Ensamblador generado para if/else}]
+# if (condicion) { ... } else { ... }
+# Evaluar condicion
+leaq -8(%rbp), %rax
+movq (%rax), %rax
+cmpq $0, %rax
+je   if_next_0_0       # si es falso, saltar al else
+# ... cuerpo del if ...
+jmp  endif_0           # saltar al fin
+if_next_0_0:
+# ... cuerpo del else ...
+endif_0:
+\end{lstlisting}
+
+\subsubsection{While}
+
+\begin{lstlisting}[style=asmstyle, caption={Ensamblador generado para while}]
+while_start_1:
+# evaluar condicion
+movq -8(%rbp), %rax
+cmpq $0, %rax
+je   while_end_1       # si condicion es falsa, salir
+# ... cuerpo del while ...
+jmp  while_start_1     # volver al inicio
+while_end_1:
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Caracteristicas Avanzadas}
+% =============================================================================
+
+\subsection{Memoria dinamica: malloc y free}
+
+Para soportar \texttt{malloc} y \texttt{free} tuvimos que hacer dos cambios. Primero, el TypeChecker las reconoce como funciones externas validas. Segundo, el parser necesita reconocer la llamada a funcion como sentencia (para \texttt{free(p);}):
+
+\begin{lstlisting}[style=csstyle, caption={Uso de memoria dinamica en CS\#}]
+int main() {
+    int n = 5;
+    int* arr = malloc(n * 8);   // reservar 5 enteros de 64 bits
+    int i = 0;
+    for (int i = 0; i < n; i++) {
+        arr[i] = i * 2;
+    }
+    printf("%ld", arr[2]);      // imprime 4
+    free(arr);                  // liberar memoria
+    return 0;
+}
+\end{lstlisting}
+
+El codigo ensamblador generado para \texttt{malloc(n * 8)} luce asi:
+
+\begin{lstlisting}[style=asmstyle, caption={Llamada a malloc generada}]
+# evaluar n * 8
+movq -8(%rbp), %rax   # cargar n
+pushq %rax
+movq $8, %rax
+movq %rax, %rcx
+popq %rax
+imulq %rcx, %rax      # n * 8
+# llamar malloc con el resultado como argumento
+popq %rdi             # no, es mas simple: el arg ya esta en %rax
+movq %rax, %rdi       # argumento a malloc
+call malloc           # resultado (puntero) queda en %rax
+movq %rax, -16(%rbp)  # guardar puntero en 'arr'
+\end{lstlisting}
+
+\subsection{Cadenas de texto (strings)}
+
+El lenguaje soporta variables de tipo \texttt{string} que en realidad son punteros a caracteres. El compilador mantiene un conjunto \texttt{stringVars} para rastrear que variables son de tipo string y asi elegir el formato correcto de \texttt{printf} (\texttt{\%s} para strings, \texttt{\%ld} para enteros).
+
+\begin{lstlisting}[style=csstyle, caption={Uso de strings en CS\#}]
+int main() {
+    string mensaje = "Hola desde CS#";
+    printf("%s", mensaje);
+    return 0;
+}
+\end{lstlisting}
+
+Los literales de cadena se emiten en la seccion \texttt{.data} del ensamblador con etiquetas unicas:
+
+\begin{lstlisting}[style=asmstyle, caption={Literal de string en el ensamblador generado}]
+.data
+str_lit_0: .string "Hola desde CS#"
+.text
+leaq str_lit_0(%rip), %rax  # poner direccion del string en %rax
+\end{lstlisting}
+
+\subsection{Funciones lambda y punteros a funcion}
+
+CS\# soporta funciones anonimas (lambdas) que pueden asignarse a variables y llamarse despues. En el nivel de ensamblador, una lambda es simplemente una funcion con una etiqueta unica que se emite antes de la funcion principal.
+
+\begin{lstlisting}[style=csstyle, caption={Uso de lambdas en CS\#}]
+int main() {
+    auto suma = (int a, int b) => {
+        return a + b;
+    };
+    int resultado = suma(3, 7);
+    printf("%ld", resultado);
+    return 0;
+}
+\end{lstlisting}
+
+El ensamblador generado salta sobre el cuerpo de la lambda (para no ejecutarla al definirla) y luego guarda la direccion de la lambda en la variable:
+
+\begin{lstlisting}[style=asmstyle, caption={Ensamblador generado para una lambda}]
+jmp lambda_skip_0          # saltar el cuerpo al definir
+lambda_anon_0:             # cuerpo de la lambda
+    pushq %rbp
+    movq %rsp, %rbp
+    movq %rdi, -8(%rbp)    # parametro a
+    movq %rsi, -16(%rbp)   # parametro b
+    # ... cuerpo ...
+    .end_lambda_anon_0:
+    leave
+    ret
+lambda_skip_0:
+leaq lambda_anon_0(%rip), %rax  # guardar direccion de la lambda
+movq %rax, -8(%rbp)             # en la variable 'suma'
+\end{lstlisting}
+
+Cuando se llama a \texttt{suma(3, 7)}, el compilador detecta que \texttt{suma} es una variable local (no una funcion declarada) y genera una llamada indirecta:
+
+\begin{lstlisting}[style=asmstyle, caption={Llamada indirecta a una lambda}]
+movq -8(%rbp), %rax   # cargar el puntero de funcion
+call *%rax            # llamada indirecta a la lambda
+\end{lstlisting}
+
+\subsection{Funciones genericas (templates)}
+
+CS\# permite declarar funciones con un parametro de tipo generico usando la sintaxis \texttt{<T>}. En el nivel de implementacion esto se maneja por \textbf{borrado de tipos} (type erasure): todos los valores se tratan como enteros de 64 bits sin importar el tipo real, lo que funciona correctamente en x86-64 donde todos los tipos primitivos caben en un registro de 64 bits.
+
+\begin{lstlisting}[style=csstyle, caption={Funcion generica en CS\#}]
+<T> T identidad(T valor) {
+    return valor;
+}
+
+int main() {
+    int x = identidad(42);
+    printf("%ld", x);
+    return 0;
+}
+\end{lstlisting}
+
+\newpage
+
+% =============================================================================
+\section{Optimizaciones}
+% =============================================================================
+
+Implementamos tres optimizaciones que el compilador aplica automaticamente. Dos de ellas (\textbf{plegado de constantes} y \textbf{Sethi-Ullman}) actuan durante la fase de generacion de codigo sobre el AST. La tercera (\textbf{mirilla}) actua como un postprocesador sobre el texto del ensamblador ya generado.
+
+\subsection{Plegado de Constantes (Constant Folding)}
+
+El plegado de constantes consiste en evaluar en tiempo de compilacion aquellas expresiones en las que ambos operandos son literales numericos conocidos. En vez de emitir instrucciones aritmeticas que se ejecutarian en tiempo de ejecucion, el compilador calcula el resultado directamente y emite un simple \texttt{movq \$resultado, \%rax}.
+
+Esta optimizacion se implementa al inicio del metodo \texttt{visit(BinaryExp*)}, antes de cualquier otra logica:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Implementacion del plegado de constantes}]
+int GenCodeVisitor::visit(BinaryExp* exp) {
+    // Verificar si ambos lados son literales numericos
+    auto* lNum = dynamic_cast<NumberExp*>(exp->left);
+    auto* rNum = dynamic_cast<NumberExp*>(exp->right);
+
+    if (lNum && rNum) {
+        long long l = lNum->value, r = rNum->value, res = 0;
+        switch (exp->op) {
+            case PLUS_OP:  res = l + r; break;
+            case MINUS_OP: res = l - r; break;
+            case MUL_OP:   res = l * r; break;
+            case DIV_OP:   res = (r != 0) ? l / r : 0; break;
+            case LT_OP:    res = l < r;  break;
+            case EQ_OP:    res = l == r; break;
+            // ... otros operadores ...
+        }
+        // Emitir directamente el resultado, sin instrucciones
+        out << "  movq $" << res << ", %rax\n";
+        return 0; // no procesar los hijos del arbol
+    }
+    // ... resto del metodo para casos no constantes ...
+}
+\end{lstlisting}
+
+Ejemplo de la diferencia en el ensamblador generado para \texttt{int x = 10 + 5}:
+
+\begin{lstlisting}[style=asmstyle, caption={Comparacion: sin vs con plegado de constantes}]
+# SIN plegado de constantes (6 instrucciones):
+movq $10, %rax
+pushq %rax
+movq $5, %rax
+movq %rax, %rcx
+popq %rax
+addq %rcx, %rax
+movq %rax, -8(%rbp)
+
+# CON plegado de constantes (2 instrucciones):
+movq $15, %rax
+movq %rax, -8(%rbp)
+\end{lstlisting}
+
+Para el archivo de prueba \texttt{demo1\_folding.fun}:
+
+\begin{lstlisting}[style=csstyle, caption={Codigo de prueba para plegado de constantes}]
+int main() {
+    int a = 10 + 5;    // -> movq $15, %rax
+    int b = 20 - 8;    // -> movq $12, %rax
+    int c = 3 * 7;     // -> movq $21, %rax
+    int d = 100 / 4;   // -> movq $25, %rax
+    printf("%ld", a);
+    printf("%ld", b);
+    printf("%ld", c);
+    printf("%ld", d);
+    return 0;
+}
+\end{lstlisting}
+
+Al compilar este archivo el compilador muestra cuantas instrucciones se plegaron y el ensamblador generado tiene solo movimientos directos de constantes.
+
+\subsection{Optimizacion de Mirilla (Peephole)}
+
+La optimizacion de mirilla recorre el ensamblador ya generado, mirando pequenas ventanas de 2 instrucciones adyacentes, y elimina los pares que no hacen nada util.
+
+La funcion \texttt{peepholeOptimize()} en \texttt{main.cpp} implementa esta logica. Trabaja con una lista de lineas del ensamblador y aplica los patrones en un bucle hasta que no encuentra mas cambios (convergencia al punto fijo).
+
+Implementamos tres patrones:
+
+\textbf{Patron 1}: push y pop del mismo registro se anulan mutuamente.
+\begin{lstlisting}[style=asmstyle, caption={Patron peephole 1: push/pop del mismo registro}]
+# ANTES (2 instrucciones inutiles):
+pushq %rax
+popq  %rax
+
+# DESPUES (eliminadas):
+# (nada)
+\end{lstlisting}
+
+\textbf{Patron 2}: guardar en memoria y volver a cargar de inmediato el mismo valor.
+\begin{lstlisting}[style=asmstyle, caption={Patron peephole 2: store + reload redundante}]
+# ANTES (la segunda instruccion es redundante):
+movq %rax, -8(%rbp)
+movq -8(%rbp), %rax
+
+# DESPUES (se elimina la segunda):
+movq %rax, -8(%rbp)
+\end{lstlisting}
+
+\textbf{Patron 3}: \texttt{leaq} seguido de desreferencia puede simplificarse a una carga directa. Este patron dispara muy frecuentemente porque el helper \texttt{genLValueAddr} siempre genera \texttt{leaq} para variables locales.
+\begin{lstlisting}[style=asmstyle, caption={Patron peephole 3: leaq + deref colapsado}]
+# ANTES (2 instrucciones para leer una variable local):
+leaq -8(%rbp), %rax
+movq (%rax), %rax
+
+# DESPUES (1 instruccion equivalente):
+movq -8(%rbp), %rax
+\end{lstlisting}
+
+La implementacion del patron 3 usa expresiones regulares para identificar el par de instrucciones:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Implementacion del patron 3 en el peephole}]
+std::regex leaqRbpRe(R"(^\s*leaq (-?\d+\(%rbp\)), %rax)");
+std::regex derefRaxRe(R"(^\s*movq \(%rax\), %rax)");
+
+if (std::regex_search(cur, m3, leaqRbpRe) &&
+    std::regex_search(next, derefRaxRe)) {
+    // Reemplazar las dos lineas por una sola
+    out.push_back("  movq " + m3[1].str() + ", %rax");
+    ++i;       // saltar la segunda linea
+    ++removed; // contar instrucciones eliminadas
+    changed = true;
+    continue;
+}
+\end{lstlisting}
+
+Al compilar \texttt{demo2\_peephole.fun}, el compilador reporta cuantas instrucciones elimino el peephole en total.
+
+\subsection{Algoritmo de Sethi-Ullman}
+
+El algoritmo de Sethi-Ullman resuelve el siguiente problema: dada una expresion representada como un arbol, en que orden hay que evaluar los subarboles para usar la menor cantidad de registros (y por lo tanto minimizar el uso del stack)?
+
+\subsubsection{Calculo de etiquetas}
+
+El algoritmo asigna un numero (etiqueta) a cada nodo del arbol de expresion segun estas reglas:
+
+\begin{itemize}
+    \item \textbf{Hoja constante} (numero literal): etiqueta = 0 (no necesita registro)
+    \item \textbf{Hoja variable}: etiqueta = 1 (necesita 1 registro para leerla)
+    \item \textbf{Nodo interno} con hijos de etiqueta izquierda $L$ y derecha $R$:
+    \begin{itemize}
+        \item Si $L = R$: etiqueta = $L + 1$ (necesita un registro extra para guardar el resultado intermedio)
+        \item Si $L \neq R$: etiqueta = $\max(L, R)$ (el subarbol mas pequeno cabe en el espacio del mas grande)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Regla de evaluacion}: siempre evaluar primero el subarbol con mayor etiqueta.
+
+\subsubsection{Ejemplo con el arbol de expresion}
+
+Tomemos la expresion \texttt{a + (b + (c + 1))} del archivo \texttt{demo3\_sethi\_ullman.fun}. El arbol de expresion con sus etiquetas seria:
+
+\begin{lstlisting}[style=grammarstyle, caption={Arbol de etiquetas Sethi-Ullman}]
+        +   <- etiqueta: max(1, 2) = 2
+       / \
+      a   +   <- etiqueta: max(1, 1) + 1 = 2
+    (1)  / \
+        b   +   <- etiqueta: max(1, 0) = 1
+      (1)  / \
+          c   1
+         (1) (0)
+\end{lstlisting}
+
+En la raiz, el hijo izquierdo (\texttt{a}) tiene etiqueta 1 y el hijo derecho (\texttt{b + (c+1)}) tiene etiqueta 2. Como la derecha es mas pesada, se evalua \textbf{primero la derecha}. Esto ahorra un push al stack porque el resultado de la derecha se puede mantener en un registro mientras se evalua \texttt{a} (que es solo una carga de memoria).
+
+\subsubsection{Implementacion}
+
+Primero calculamos la etiqueta de forma recursiva:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Calculo de etiqueta Sethi-Ullman}]
+int GenCodeVisitor::sethiUllmanLabel(Exp* exp) {
+    if (!exp) return 0;
+
+    // Hojas constantes: peso 0
+    if (dynamic_cast<NumberExp*>(exp) ||
+        dynamic_cast<BoolExp*>(exp))
+        return 0;
+
+    // Hojas variables: peso 1
+    if (dynamic_cast<LValueNode*>(exp) ||
+        dynamic_cast<StringLiteralExp*>(exp))
+        return 1;
+
+    // Nodo binario: aplicar regla de Sethi-Ullman
+    if (auto* bin = dynamic_cast<BinaryExp*>(exp)) {
+        int l = sethiUllmanLabel(bin->left);
+        int r = sethiUllmanLabel(bin->right);
+        return (l == r) ? l + 1 : std::max(l, r);
+    }
+
+    // Llamadas a funcion y otros: tratarlos como pesados
+    return 2;
+}
+\end{lstlisting}
+
+Luego usamos ese calculo en \texttt{visit(BinaryExp*)} para decidir el orden de evaluacion:
+
+\begin{lstlisting}[language=C++, style=cppstyle, caption={Aplicacion de Sethi-Ullman en la generacion de codigo}]
+// Calcular el peso de cada subarbol
+int labelL = sethiUllmanLabel(exp->left);
+int labelR = sethiUllmanLabel(exp->right);
+bool evalRightFirst = (labelR > labelL);
+
+// Para operaciones no conmutativas (-, /), hay que
+// intercambiar registros si se evaluo al reves
+bool nonCommutative = (exp->op != PLUS_OP &&
+                       exp->op != MUL_OP  &&
+                       exp->op != EQ_OP   &&
+                       exp->op != NE_OP);
+
+if (evalRightFirst) {
+    suReorders++; // contar para el reporte final
+    exp->right->accept(this);      // evaluar el mas pesado primero
+    out << "  pushq %rax\n";
+    exp->left->accept(this);       // evaluar el mas liviano
+    out << "  movq %rax, %rcx\n";
+    out << "  popq %rax\n";
+    // Si la operacion no es conmutativa, los registros quedaron
+    // invertidos. Intercambiarlos con xchgq para corregirlo.
+    if (nonCommutative)
+        out << "  xchgq %rax, %rcx\n";
+} else {
+    // Orden estandar: izquierda primero
+    exp->left->accept(this);
+    out << "  pushq %rax\n";
+    exp->right->accept(this);
+    out << "  movq %rax, %rcx\n";
+    out << "  popq %rax\n";
+}
+\end{lstlisting}
+
+Al compilar cualquier programa, el compilador reporta al final cuantos reordenamientos de Sethi-Ullman se aplicaron:
+
+\begin{lstlisting}[style=grammarstyle, caption={Salida del compilador con las optimizaciones activas}]
+========================================
+      INICIANDO COMPILACION
+========================================
+Archivo: demo3_sethi_ullman.fun
+
+[OK] Analisis lexico completado.
+[OK] Analisis sintactico completado.
+
+[INFO] Ejecutando analisis semantico...
+[OK] Analisis semantico completado.
+[OK] Generacion de codigo x86 completada.
+
+[OPT] Sethi-Ullman: 1 reordenamiento(s) de operandos aplicado(s).
+[OPT] Peephole: 8 instruccion(es) eliminada(s).
+
+========================================
+      COMPILACION EXITOSA
+========================================
+\end{lstlisting}
+
+\subsubsection{Beneficio del reordenamiento}
+
+Para ilustrar el beneficio, comparemos el ensamblador generado para \texttt{a + (b + (c + 1))} con y sin Sethi-Ullman:
+
+\begin{lstlisting}[style=asmstyle, caption={Sin Sethi-Ullman: evaluar izquierda primero}]
+# Evaluar 'a' primero (izquierda)
+movq -8(%rbp), %rax    # a -> %rax
+pushq %rax             # guardar 'a' en el stack (profundidad 1)
+  # Evaluar 'b + (c+1)' (derecha, mas pesado)
+  movq -16(%rbp), %rax  # b -> %rax
+  pushq %rax            # guardar 'b' (profundidad 2)
+    movq -24(%rbp), %rax # c
+    pushq %rax           # profundidad 3
+    movq $1, %rax
+    movq %rax, %rcx
+    popq %rax
+    addq %rcx, %rax     # c + 1
+  movq %rax, %rcx
+  popq %rax
+  addq %rcx, %rax      # b + (c+1)
+movq %rax, %rcx
+popq %rax              # recuperar 'a'
+addq %rcx, %rax        # a + (b + (c+1))
+\end{lstlisting}
+
+\begin{lstlisting}[style=asmstyle, caption={Con Sethi-Ullman: evaluar derecha primero (mas pesada)}]
+# Evaluar 'b + (c+1)' primero (mas pesado, derecha)
+  movq -16(%rbp), %rax  # b
+  pushq %rax            # profundidad 1 (maximo)
+    movq -24(%rbp), %rax # c
+    pushq %rax           # profundidad 2 (un solo nivel extra)
+    movq $1, %rax
+    movq %rax, %rcx
+    popq %rax
+    addq %rcx, %rax
+  movq %rax, %rcx
+  popq %rax
+  addq %rcx, %rax      # resultado de b+(c+1) en %rax
+pushq %rax             # guardar ese resultado
+movq -8(%rbp), %rax   # evaluar 'a' (simple, 1 instruccion)
+movq %rax, %rcx
+popq %rax
+addq %rcx, %rax       # a + (b+(c+1))
+\end{lstlisting}
+
+En este ejemplo la diferencia en profundidad de stack no es enorme, pero en expresiones mas complejas con subarboles mas desbalanceados el beneficio es considerable.
+
+\newpage
+
+% =============================================================================
+\section{Evaluacion Comparativa}
+% =============================================================================
+
+En esta seccion comparamos el codigo generado por nuestro compilador CS\# con el codigo que produce GCC y Clang al compilar un programa equivalente en C.
+
+Para la comparacion usamos los mismos programas de prueba (\texttt{demo1\_folding.fun}, \texttt{demo2\_peephole.fun} y \texttt{demo3\_sethi\_ullman.fun}) y medimos:
+
+\begin{itemize}
+    \item Numero de instrucciones generadas
+    \item Tamanho del archivo ensamblador resultante
+    \item Tiempo de ejecucion del programa compilado
+\end{itemize}
+
+% ============================================================
+% TODO: Completar esta seccion con los datos de la comparacion
+% Ejecutar los benchmarks y llenar las tablas a continuacion
+% ============================================================
+
+\subsection{Numero de instrucciones generadas}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Programa} & \textbf{CS\# (nuestro)} & \textbf{GCC -O0} & \textbf{GCC -O2} \\
+\midrule
+demo1\_folding & \textit{[completar]} & \textit{[completar]} & \textit{[completar]} \\
+demo2\_peephole & \textit{[completar]} & \textit{[completar]} & \textit{[completar]} \\
+demo3\_sethi\_ullman & \textit{[completar]} & \textit{[completar]} & \textit{[completar]} \\
+\bottomrule
+\end{tabular}
+\caption{Comparacion de numero de instrucciones ensamblador}
+\end{table}
+
+\subsection{Analisis del codigo generado}
+
+% TODO: Agregar aqui el analisis comparativo del ensamblador
+% Mostrar fragmentos del .s generado por CS# vs GCC -O0 y GCC -O2
+
+\vspace{3cm}
+\textit{[Espacio reservado para el analisis comparativo -- completar con resultados de benchmark]}
+\vspace{3cm}
+
+\subsection{Observaciones}
+
+% TODO: Describir que optimizaciones hace GCC que nosotros no hacemos,
+% y cuales de las nuestras coinciden con las de GCC
+
+\vspace{3cm}
+\textit{[Espacio reservado para observaciones y analisis -- completar]}
+\vspace{3cm}
+
+\newpage
+
+% =============================================================================
+\section{Conclusiones}
+% =============================================================================
+
+En este proyecto logramos implementar un compilador funcional de extremo a extremo para el lenguaje CS\#. El compilador es capaz de tomar codigo fuente, realizar todas las fases de compilacion y producir codigo ensamblador x86-64 que se ejecuta correctamente en Linux de 64 bits.
+
+Algunos de los aprendizajes mas importantes que tuvimos durante el proyecto:
+
+\textbf{La convencion de llamada es critica}. Al principio no eramos muy cuidadosos con el orden de los registros y la alineacion del stack, y esto causaba fallos en tiempo de ejecucion que eran muy dificiles de depurar. Una vez que entendimos bien el ABI System V AMD64, las cosas funcionaron mucho mejor.
+
+\textbf{El patron Visitor es muy poderoso}. Tener el AST completamente separado de las operaciones que se hacen sobre el nos permitio agregar el TypeChecker, el GenCodeVisitor y el modo JSON de AST sin tocar las clases de los nodos. Esto facilito mucho la depuracion.
+
+\textbf{La separacion entre ``obtener la direccion'' y ``obtener el valor'' es fundamental}. Al principio teniamos muchos errores porque confundiamos cuando debiamos emitir \texttt{leaq} versus \texttt{movq}. El helper \texttt{genLValueAddr()} que creamos para centralizar esa logica elimino casi todos esos problemas.
+
+\textbf{Las optimizaciones son mas complicadas de lo que parecen}. Implementar plegado de constantes fue relativamente directo, pero Sethi-Ullman requirio pensar con cuidado en como manejar las operaciones no conmutativas (como resta y division) cuando los operandos se evaluan en orden inverso.
+
+En cuanto a lo que dejamos fuera del alcance del proyecto: no implementamos inferencia de tipos completa para \texttt{auto} (usamos borrado de tipos), no tenemos soporte para arreglos multidimensionales reales (solo punteros a punteros), y la optimizacion de Sethi-Ullman es correcta pero no considera el caso de reutilizar subexpresiones comunes (CSE).
+
+Como trabajo futuro seria interesante implementar una representacion intermedia (IR) entre el AST y el ensamblador, lo que facilitaria agregar mas optimizaciones avanzadas como asignacion de registros real, propagacion de copias y eliminacion de subexpresiones comunes.
+
+\newpage
+
+% =============================================================================
+% Referencias
+% =============================================================================
+\begin{thebibliography}{9}
+
+\bibitem{dragon}
+Alfred V. Aho, Monica S. Lam, Ravi Sethi, Jeffrey D. Ullman.
+\textit{Compilers: Principles, Techniques, and Tools} (2nd edition).
+Addison-Wesley, 2006.
+
+\bibitem{sethi-ullman}
+Ravi Sethi, J.D. Ullman.
+\textit{The Generation of Optimal Code for Arithmetic Expressions}.
+Journal of the ACM, 17(4):715-728, 1970.
+
+\bibitem{x86abi}
+\textit{System V Application Binary Interface -- AMD64 Architecture Processor Supplement}.
+Version 0.99.8, 2018.
+
+\bibitem{intel}
+Intel Corporation.
+\textit{Intel 64 and IA-32 Architectures Software Developer's Manual}.
+Volume 2: Instruction Set Reference.
+
+\bibitem{peephole}
+William M. McKeeman.
+\textit{Peephole Optimization}.
+Communications of the ACM, 8(7):443-444, 1965.
+
+\end{thebibliography}
+
+\end{document}
