@@ -29,5 +29,5 @@ int main() {
 
     printf("Final", resultado);
 
-    return resultado;
+    return 0;
 }

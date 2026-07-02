@@ -228,7 +228,7 @@ StructDec *Parser::parseStructDec()
         expect(Token::SEMICOL);
     }
     expect(Token::RBRACE);  // }
-    expect(Token::SEMICOL); // ;
+    match(Token::SEMICOL);  // ; opcional (C# no lo requiere)
 
     return new StructDec(structName, mTypes, mNames);
 }

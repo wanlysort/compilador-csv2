@@ -1,8 +1,6 @@
 int main() {
-
     int x = 10;
-
     int* p = &x;
-
+    printf("valor", *p);
     return 0;
 }

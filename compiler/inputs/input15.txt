@@ -21,6 +21,6 @@ int main() {
     if(total > 10) {
         total = sumar(total,p.edad);
     }
-
-    return total;
+    printf("total", total);
+    return 0;
 }

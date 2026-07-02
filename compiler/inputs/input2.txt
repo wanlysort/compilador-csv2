@@ -4,5 +4,7 @@ int main() {
 
     int resultado = a + b * 2;
 
-    return resultado;
+    printf("resultado", resultado);
+
+    return 0;
 }

@@ -113,6 +113,7 @@ int TypeCheckerVisitor::visit(VarNode *vn)
                   << "' ya declarada en este ámbito.\n";
     }
     entorno.add_var(vn->id, 0);
+    locales++;  // Contar cada variable local para reservar espacio en el frame
 
     if (vn->initializer)
     {
@@ -261,7 +262,8 @@ int TypeCheckerVisitor::visit(BinaryExp *exp)
 
 int TypeCheckerVisitor::visit(UnaryExp *node)
 {
-    node->operand->accept(this);
+    if (node->operand)
+        node->operand->accept(this);
     return 0;
 }
 
@@ -284,26 +286,30 @@ int TypeCheckerVisitor::visit(LambdaDecExp *lambda)
 
 int TypeCheckerVisitor::visit(CallExp *exp)
 {
-    if (funAridad.find(exp->functionName) == funAridad.end())
+    // Permitir llamadas a variables que guardan lambdas (función por puntero)
+    bool esFuncionDeclarada = funAridad.find(exp->functionName) != funAridad.end();
+    bool esVariableLocal    = entorno.check(exp->functionName);
+
+    if (!esFuncionDeclarada && !esVariableLocal)
     {
         throw std::runtime_error(
             "[TypeChecker] Funcion no declarada: '" +
             exp->functionName + "'");
     }
 
-    int esperados = funAridad[exp->functionName];
-
-    if ((int)exp->args.size() != esperados)
+    if (esFuncionDeclarada)
     {
-        throw std::runtime_error(
-            "[TypeChecker] Cantidad incorrecta de argumentos para '" +
-            exp->functionName + "'");
+        int esperados = funAridad[exp->functionName];
+        if ((int)exp->args.size() != esperados)
+        {
+            throw std::runtime_error(
+                "[TypeChecker] Cantidad incorrecta de argumentos para '" +
+                exp->functionName + "'");
+        }
     }
 
     for (auto arg : exp->args)
-    {
         arg->accept(this);
-    }
 
     return 0;
 }
@@ -409,20 +415,21 @@ int GenCodeVisitor::visit(Body *b)
     return 0;
 }
 
-int GenCodeVisitor::visit(LValueNode *lval)
+void GenCodeVisitor::genLValueAddr(LValueNode *lval)
 {
-
     std::string baseId = lval->memberIds[0];
 
+    // Dirección base de la variable
     if (memoriaGlobal.count(baseId))
-    {
         out << "  leaq " << baseId << "(%rip), %rax\n";
-    }
     else
-    {
         out << "  leaq " << memoria[baseId] << "(%rbp), %rax\n";
-    }
 
+    // Desreferencias de puntero: *p → carga el valor de p (que es otra dirección)
+    for (int d = 0; d < lval->dereferenceLevel; d++)
+        out << "  movq (%rax), %rax\n";
+
+    // Accesos a arreglos: a[i]
     for (size_t i = 0; i < lval->dimAccesses.size(); ++i)
     {
         for (auto expr : lval->dimAccesses[i])
@@ -435,6 +442,13 @@ int GenCodeVisitor::visit(LValueNode *lval)
             out << "  addq %rcx, %rax\n";
         }
     }
+}
+
+// LValue usado como expresión → carga el VALOR (no la dirección)
+int GenCodeVisitor::visit(LValueNode *lval)
+{
+    genLValueAddr(lval);
+    out << "  movq (%rax), %rax\n";
     return 0;
 }
 
@@ -442,13 +456,21 @@ int GenCodeVisitor::visit(LValueNode *lval)
 
 int GenCodeVisitor::visit(AssignStm *stm)
 {
-    // CORREGIDO: stm->exp -> stm->expression
+    genLValueAddr(stm->target);   // dirección del destino en %rax
+    out << "  pushq %rax\n";      // salvar dirección
+    stm->e->accept(this);         // evaluar RHS → valor en %rax
+    out << "  popq %rcx\n";       // recuperar dirección
+    out << "  movq %rax, (%rcx)\n"; // guardar valor en destino
     return 0;
 }
 
 int GenCodeVisitor::visit(PrintfStm *stm)
 {
-    // CORREGIDO: stm->exp -> stm->expression
+    stm->e->accept(this);                               // valor en %rax
+    out << "  movq %rax, %rsi\n";                       // segundo argumento de printf
+    out << "  leaq print_val_fmt(%rip), %rdi\n";        // formato "%ld\n"
+    out << "  movq $0, %rax\n";                         // sin registros xmm
+    out << "  call printf\n";
     return 0;
 }
 
@@ -628,14 +650,18 @@ int GenCodeVisitor::visit(UnaryExp *node)
 {
     if (node->op == NOT_OP)
     {
-        node->operand->accept(this);
+        if (node->operand) node->operand->accept(this);
         out << "  cmpq $0, %rax\n";
         out << "  sete %al\n";
         out << "  movzbq %al, %rax\n";
     }
     else if (node->op == ADDRESS_OF_OP)
     {
-        // CORREGIDO: node->idTarget -> node->operand (Ajusta según tu ast.h si guarda el ID o la expresión)
+        // &id → deja la DIRECCIÓN de la variable en %rax
+        if (memoriaGlobal.count(node->targetId))
+            out << "  leaq " << node->targetId << "(%rip), %rax\n";
+        else
+            out << "  leaq " << memoria[node->targetId] << "(%rbp), %rax\n";
     }
     return 0;
 }
@@ -675,9 +701,10 @@ int GenCodeVisitor::visit(LambdaDecExp *lambda)
     const std::vector<std::string> argRegs = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
     int oldOffset = offset;
     auto oldMem = memoria;
+    std::string savedFuncion = nombreFuncion;  // guardar contexto de función externa
 
+    nombreFuncion = lambdaLabel;               // ReturnStm usará el label correcto
     offset = -8;
-    // CORREGIDO: lambda->pNames -> lambda->paramNames
     for (size_t i = 0; i < lambda->paramNames.size(); ++i)
     {
         memoria[lambda->paramNames[i]] = offset;
@@ -687,8 +714,11 @@ int GenCodeVisitor::visit(LambdaDecExp *lambda)
 
     lambda->body->accept(this);
 
+    out << ".end_" << lambdaLabel << ":\n";
     out << "  leave\n  ret\n";
     out << "lambda_skip_" << lbl << ":\n";
+
+    nombreFuncion = savedFuncion;              // restaurar contexto
 
     memoria = oldMem;
     offset = oldOffset;
@@ -716,7 +746,19 @@ int GenCodeVisitor::visit(FunDec *f)
     for (int i = 0; i < nParams; i++)
     {
         memoria[f->paramNames[i]] = offset;
-        out << "  movq " << argRegs[i] << ", " << offset << "(%rbp)\n";
+        if (i < (int)argRegs.size())
+        {
+            // Primeros 6: vienen en registros
+            out << "  movq " << argRegs[i] << ", " << offset << "(%rbp)\n";
+        }
+        else
+        {
+            // Args 7+: vienen en el stack, encima del rbp guardado
+            // arg7 está en 16(%rbp), arg8 en 24(%rbp), etc.
+            int stackArgOffset = 16 + (i - (int)argRegs.size()) * 8;
+            out << "  movq " << stackArgOffset << "(%rbp), %rax\n";
+            out << "  movq %rax, " << offset << "(%rbp)\n";
+        }
         offset -= 8;
     }
 
@@ -732,22 +774,55 @@ int GenCodeVisitor::visit(FunDec *f)
 int GenCodeVisitor::visit(CallExp *exp)
 {
     static const std::vector<std::string> argRegs =
-        {
-            "%rdi",
-            "%rsi",
-            "%rdx",
-            "%rcx",
-            "%r8",
-            "%r9"};
+        {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
 
-    for (size_t i = 0; i < exp->args.size(); i++)
+    size_t nArgs = exp->args.size();
+    size_t nReg  = std::min(nArgs, argRegs.size());
+    size_t nStk  = (nArgs > argRegs.size()) ? nArgs - argRegs.size() : 0;
+
+    // Evaluar y guardar todos los args en el stack temporalmente (de derecha a izquierda)
+    for (int i = (int)nArgs - 1; i >= 0; i--)
     {
         exp->args[i]->accept(this);
-
-        out << "  movq %rax, " << argRegs[i] << "\n";
+        out << "  pushq %rax\n";
     }
 
-    out << "  call " << exp->functionName << "\n";
+    // Cargar los primeros 6 desde el stack a registros
+    for (size_t i = 0; i < nReg; i++)
+        out << "  popq " << argRegs[i] << "\n";
+
+    // Los args 7+ ya quedaron en el stack en el orden correcto (arg7 en el tope)
+    // Alinear el stack a 16 bytes si hay args en stack y el total de pushes es impar
+    bool needAlign = (nStk % 2 != 0);
+    if (needAlign)
+        out << "  subq $8, %rsp\n";
+
+    if (funcontador.count(exp->functionName))
+    {
+        // Función declarada → llamada directa
+        out << "  call " << exp->functionName << "\n";
+    }
+    else if (memoria.count(exp->functionName))
+    {
+        // Variable local con puntero a función → llamada indirecta
+        out << "  movq " << memoria[exp->functionName] << "(%rbp), %rax\n";
+        out << "  call *%rax\n";
+    }
+    else if (memoriaGlobal.count(exp->functionName))
+    {
+        // Variable global con puntero a función → llamada indirecta
+        out << "  movq " << exp->functionName << "(%rip), %rax\n";
+        out << "  call *%rax\n";
+    }
+    else
+    {
+        // Fallback: printf u otras funciones externas
+        out << "  call " << exp->functionName << "\n";
+    }
+
+    // Limpiar args en stack
+    if (nStk > 0)
+        out << "  addq $" << (nStk + (needAlign ? 1 : 0)) * 8 << ", %rsp\n";
 
     return 0;
 }

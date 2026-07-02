@@ -1,8 +1,7 @@
 int main() {
-
     auto f = () => {
         return 10;
     };
-
+    printf("resultado", f());
     return 0;
 }

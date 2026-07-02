@@ -150,6 +150,9 @@ public:
     // Constructor vinculando el stream de salida
     GenCodeVisitor(std::ostream &out) : out(out) {}
 
+    // Helper — emite código que deja la DIRECCIÓN del lvalue en %rax (sin deref)
+    void genLValueAddr(LValueNode *lval);
+
     // Punto de entrada para la fase de Síntesis
     int generar(Program *program);
 

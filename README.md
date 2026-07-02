@@ -21,10 +21,9 @@ PROYECTOFINAL/
 En WSL, desde la carpeta `compiler/`:
 
 ```bash
-g++ -std=c++17 -O2 \
-    main.cpp scanner.cpp token.cpp parser.cpp \
-    ast.cpp visitor.cpp ast_printer.cpp \
-    -o compilador
+
+g++ -std=c++17 -O2 main.cpp scanner.cpp token.cpp parser.cpp ast.cpp visitor.cpp ast_printer.cpp -o compilador
+
 ```
 
 Verifica que funciona:

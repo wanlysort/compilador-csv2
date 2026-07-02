@@ -117,7 +117,10 @@ def compile_code(req: CompileRequest):
                 timeout=TIMEOUT_SEC,
             )
             if ast_result.returncode == 0 and ast_result.stdout.strip():
-                ast_data = json.loads(ast_result.stdout)
+                stdout = ast_result.stdout.strip()
+                json_start = stdout.find('{')
+                if json_start != -1:
+                    ast_data = json.loads(stdout[json_start:])
         except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
             ast_data = None
 
